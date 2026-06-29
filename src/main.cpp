@@ -1,8 +1,14 @@
 #include "environment3d.h"
 #include "raylib.h"
-#include "terrain_panel.h"
-#include "terrain_plane.h"
+#include "terrain/terrain_panel.h"
+#include "terrain/terrain_plane.h"
 
+// ----------------------------
+// main
+//
+// Inicializa a janela, atualiza a cena e coordena desenho de UI e terreno.
+//
+// ----------------------------
 int main(void)
 {
     SetConfigFlags(
@@ -38,7 +44,7 @@ int main(void)
             terrainPanelCapturesInput || editingNoiseScale);
 
         BeginDrawing();
-        ClearBackground(RAYWHITE);
+        DrawSkyBackground();
 
         BeginMode3D(environment.camera);
         DrawTerrainPlane(terrain, environment.camera);

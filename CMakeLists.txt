@@ -16,8 +16,12 @@ set_target_properties(raylib PROPERTIES
 add_executable(IndustrialMagic
     src/main.cpp
     src/environment3d.cpp
-    src/terrain_plane.cpp
-    src/terrain_panel.cpp
+    src/terrain/terrain_draw.cpp
+    src/terrain/terrain_geometry.cpp
+    src/terrain/terrain_noise.cpp
+    src/terrain/terrain_plane.cpp
+    src/terrain/terrain_render.cpp
+    src/terrain/terrain_panel.cpp
 )
 
 target_include_directories(IndustrialMagic PRIVATE

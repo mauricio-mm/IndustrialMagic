@@ -1,7 +1,7 @@
 #ifndef TERRAIN_PANEL_H
 #define TERRAIN_PANEL_H
 
-#include "terrain_plane.h"
+#include "terrain/terrain_plane.h"
 
 #include <array>
 #include <string>

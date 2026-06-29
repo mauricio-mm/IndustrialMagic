@@ -1,4 +1,4 @@
-#include "terrain_panel.h"
+#include "terrain/terrain_panel.h"
 
 #include "raylib.h"
 
@@ -31,6 +31,12 @@ constexpr Color activeBorder = { 40, 116, 196, 255 };
 constexpr Color buttonColor = { 40, 116, 196, 255 };
 constexpr Color buttonHoverColor = { 31, 98, 170, 255 };
 
+// ----------------------------
+// GetSidebarBounds
+//
+// Calcula a area ocupada pela barra lateral do terrain.
+//
+// ----------------------------
 Rectangle GetSidebarBounds()
 {
     return {
@@ -41,6 +47,12 @@ Rectangle GetSidebarBounds()
     };
 }
 
+// ----------------------------
+// GetInputBounds
+//
+// Retorna as areas dos quatro campos de entrada do painel.
+//
+// ----------------------------
 std::array<Rectangle, 4> GetInputBounds()
 {
     const Rectangle sidebar = GetSidebarBounds();
@@ -72,6 +84,12 @@ std::array<Rectangle, 4> GetInputBounds()
     };
 }
 
+// ----------------------------
+// GetApplyButtonBounds
+//
+// Calcula a area do botao que aplica os valores digitados.
+//
+// ----------------------------
 Rectangle GetApplyButtonBounds()
 {
     const Rectangle sidebar = GetSidebarBounds();
@@ -83,6 +101,12 @@ Rectangle GetApplyButtonBounds()
     };
 }
 
+// ----------------------------
+// GetGenerateButtonBounds
+//
+// Calcula a area do botao que muda a seed do terreno.
+//
+// ----------------------------
 Rectangle GetGenerateButtonBounds()
 {
     const Rectangle sidebar = GetSidebarBounds();
@@ -94,6 +118,12 @@ Rectangle GetGenerateButtonBounds()
     };
 }
 
+// ----------------------------
+// GetFlatMapButtonBounds
+//
+// Calcula a area do botao do mapa plano.
+//
+// ----------------------------
 Rectangle GetFlatMapButtonBounds()
 {
     const Rectangle sidebar = GetSidebarBounds();
@@ -105,6 +135,12 @@ Rectangle GetFlatMapButtonBounds()
     };
 }
 
+// ----------------------------
+// GetWorldMapButtonBounds
+//
+// Calcula a area do botao do mundo quadrado.
+//
+// ----------------------------
 Rectangle GetWorldMapButtonBounds()
 {
     const Rectangle sidebar = GetSidebarBounds();
@@ -116,11 +152,23 @@ Rectangle GetWorldMapButtonBounds()
     };
 }
 
+// ----------------------------
+// ToIndex
+//
+// Converte um indice inteiro para o tipo usado por arrays.
+//
+// ----------------------------
 std::size_t ToIndex(int value)
 {
     return static_cast<std::size_t>(value);
 }
 
+// ----------------------------
+// ParseTerrainSize
+//
+// Converte texto para tamanho de terreno dentro dos limites aceitos.
+//
+// ----------------------------
 int ParseTerrainSize(const std::string &value)
 {
     if (value.empty())
@@ -134,6 +182,12 @@ int ParseTerrainSize(const std::string &value)
         maximumTerrainSize);
 }
 
+// ----------------------------
+// ParseTerrainMeasure
+//
+// Converte texto para medida em metros dentro dos limites aceitos.
+//
+// ----------------------------
 float ParseTerrainMeasure(
     const std::string &value,
     float minimumValue,
@@ -150,6 +204,12 @@ float ParseTerrainMeasure(
         maximumValue);
 }
 
+// ----------------------------
+// FormatMeasure
+//
+// Formata medidas sem casas decimais quando o valor e inteiro.
+//
+// ----------------------------
 std::string FormatMeasure(float value)
 {
     if (std::fabs(value - std::round(value)) < 0.001f)
@@ -162,12 +222,18 @@ std::string FormatMeasure(float value)
     return buffer;
 }
 
+// ----------------------------
+// ApplyTerrainSize
+//
+// Aplica largura, altura, montanhas e lagos digitados no painel.
+//
+// ----------------------------
 void ApplyTerrainSize(
     TerrainPanel *panel,
     TerrainPlane *terrain)
 {
-    terrain->widthCells = ParseTerrainSize(panel->values[0]);
-    terrain->heightCells = ParseTerrainSize(panel->values[1]);
+    terrain->widthCells    = ParseTerrainSize(panel->values[0]);
+    terrain->heightCells   = ParseTerrainSize(panel->values[1]);
     terrain->maximumHeight = ParseTerrainMeasure(
         panel->values[2],
         minimumMountainHeight,
@@ -177,14 +243,20 @@ void ApplyTerrainSize(
         minimumLakeDepth,
         maximumLakeDepth);
     GenerateTerrainPlane(terrain);
-    panel->values[0] = std::to_string(terrain->widthCells);
-    panel->values[1] = std::to_string(terrain->heightCells);
-    panel->values[2] = FormatMeasure(terrain->maximumHeight);
-    panel->values[3] = FormatMeasure(terrain->lakeDepth);
-    panel->activeField = -1;
+    panel->values[0]          = std::to_string(terrain->widthCells);
+    panel->values[1]          = std::to_string(terrain->heightCells);
+    panel->values[2]          = FormatMeasure(terrain->maximumHeight);
+    panel->values[3]          = FormatMeasure(terrain->lakeDepth);
+    panel->activeField        = -1;
     panel->replaceOnNextInput = false;
 }
 
+// ----------------------------
+// GenerateNewTerrain
+//
+// Incrementa a seed e regenera o terreno com os valores atuais.
+//
+// ----------------------------
 void GenerateNewTerrain(
     TerrainPanel *panel,
     TerrainPlane *terrain)
@@ -193,6 +265,12 @@ void GenerateNewTerrain(
     ApplyTerrainSize(panel, terrain);
 }
 
+// ----------------------------
+// PrepareForReplacement
+//
+// Limpa o campo quando o proximo input deve substituir o valor atual.
+//
+// ----------------------------
 void PrepareForReplacement(TerrainPanel *panel, std::string *value)
 {
     if (panel->replaceOnNextInput)
@@ -202,11 +280,23 @@ void PrepareForReplacement(TerrainPanel *panel, std::string *value)
     }
 }
 
+// ----------------------------
+// CanAppendCharacter
+//
+// Verifica se o campo ainda aceita mais caracteres.
+//
+// ----------------------------
 bool CanAppendCharacter(const std::string &value)
 {
     return static_cast<int>(value.size()) < maximumCharacters;
 }
 
+// ----------------------------
+// UpdateActiveInput
+//
+// Processa teclado, backspace e escape no campo ativo.
+//
+// ----------------------------
 void UpdateActiveInput(TerrainPanel *panel)
 {
     if (panel->activeField < 0)
@@ -265,6 +355,12 @@ void UpdateActiveInput(TerrainPanel *panel)
     }
 }
 
+// ----------------------------
+// DrawInput
+//
+// Desenha um campo de texto com label, borda ativa e cursor.
+//
+// ----------------------------
 void DrawInput(
     const TerrainPanel &panel,
     int field,
@@ -295,7 +391,7 @@ void DrawInput(
     {
         const int textWidth =
             MeasureText(panel.values[ToIndex(field)].c_str(), 20);
-        const int cursorX =
+        const int cursorX   =
             static_cast<int>(bounds.x + 13.0f) + textWidth;
         DrawLine(
             cursorX,
@@ -307,28 +403,40 @@ void DrawInput(
 }
 }
 
+// ----------------------------
+// CreateTerrainPanel
+//
+// Cria o painel com valores iniciais para o terreno.
+//
+// ----------------------------
 TerrainPanel CreateTerrainPanel()
 {
     TerrainPanel panel = {};
-    panel.values = { "32", "32", "15", "4" };
-    panel.activeField = -1;
+    panel.values             = { "32", "32", "15", "4" };
+    panel.activeField        = -1;
     panel.replaceOnNextInput = false;
-    panel.tabPressed = false;
+    panel.tabPressed         = false;
     return panel;
 }
 
+// ----------------------------
+// UpdateTerrainPanel
+//
+// Atualiza inputs, botoes e captura de mouse do painel.
+//
+// ----------------------------
 bool UpdateTerrainPanel(
     TerrainPanel *panel,
     TerrainPlane *terrain)
 {
-    const Rectangle sidebar = GetSidebarBounds();
-    const std::array<Rectangle, 4> inputs = GetInputBounds();
-    const Rectangle button = GetApplyButtonBounds();
-    const Rectangle generateButton = GetGenerateButtonBounds();
-    const Rectangle flatMapButton = GetFlatMapButtonBounds();
-    const Rectangle worldMapButton = GetWorldMapButtonBounds();
-    const Vector2 mousePosition = GetMousePosition();
-    const bool mouseInside =
+    const Rectangle sidebar                       = GetSidebarBounds();
+    const std::array<Rectangle, 4> inputs         = GetInputBounds();
+    const Rectangle button                        = GetApplyButtonBounds();
+    const Rectangle generateButton                = GetGenerateButtonBounds();
+    const Rectangle flatMapButton                 = GetFlatMapButtonBounds();
+    const Rectangle worldMapButton                = GetWorldMapButtonBounds();
+    const Vector2 mousePosition                   = GetMousePosition();
+    const bool mouseInside                        =
         CheckCollisionPointRec(mousePosition, sidebar);
     panel->tabPressed = IsKeyPressed(KEY_TAB);
 
@@ -385,23 +493,29 @@ bool UpdateTerrainPanel(
     return mouseInside || panel->activeField >= 0;
 }
 
+// ----------------------------
+// DrawTerrainPanel
+//
+// Desenha a barra lateral com campos, botoes e status do terreno.
+//
+// ----------------------------
 void DrawTerrainPanel(
     const TerrainPanel &panel,
     const TerrainPlane &terrain)
 {
-    const Rectangle sidebar = GetSidebarBounds();
-    const std::array<Rectangle, 4> inputs = GetInputBounds();
-    const Rectangle button = GetApplyButtonBounds();
-    const Rectangle generateButton = GetGenerateButtonBounds();
-    const Rectangle flatMapButton = GetFlatMapButtonBounds();
-    const Rectangle worldMapButton = GetWorldMapButtonBounds();
-    const bool buttonHovered =
+    const Rectangle sidebar                       = GetSidebarBounds();
+    const std::array<Rectangle, 4> inputs         = GetInputBounds();
+    const Rectangle button                        = GetApplyButtonBounds();
+    const Rectangle generateButton                = GetGenerateButtonBounds();
+    const Rectangle flatMapButton                 = GetFlatMapButtonBounds();
+    const Rectangle worldMapButton                = GetWorldMapButtonBounds();
+    const bool buttonHovered                      =
         CheckCollisionPointRec(GetMousePosition(), button);
-    const bool generateButtonHovered =
+    const bool generateButtonHovered              =
         CheckCollisionPointRec(GetMousePosition(), generateButton);
-    const bool flatMapHovered =
+    const bool flatMapHovered                     =
         CheckCollisionPointRec(GetMousePosition(), flatMapButton);
-    const bool worldMapHovered =
+    const bool worldMapHovered                    =
         CheckCollisionPointRec(GetMousePosition(), worldMapButton);
 
     DrawRectangleRec(sidebar, sidebarBackground);

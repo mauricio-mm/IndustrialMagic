@@ -23,6 +23,7 @@ void InitEnvironment3D();
 void UpdateEnvironment3D(
     Environment3D *environment,
     bool blockMouseInput);
+void DrawSkyBackground();
 void DrawEnvironment3D(const Environment3D &environment);
 void ShutdownEnvironment3D();
 
