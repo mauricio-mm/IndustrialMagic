@@ -21,7 +21,21 @@ int main(void)
     while (!WindowShouldClose())
     {
         const bool terrainPanelCapturesInput = UpdateTerrainPanel(&terrainPanel, &terrain);
-        UpdateEnvironment3D(&environment, terrainPanelCapturesInput);
+        if (terrainPanel.tabPressed)
+        {
+            terrain.showMesh = !terrain.showMesh;
+        }
+
+        const bool editingNoiseScale = IsKeyDown(KEY_R);
+
+        if (editingNoiseScale)
+        {
+            AdjustTerrainNoiseScale(&terrain, GetMouseWheelMove());
+        }
+
+        UpdateEnvironment3D(
+            &environment,
+            terrainPanelCapturesInput || editingNoiseScale);
 
         BeginDrawing();
         ClearBackground(RAYWHITE);

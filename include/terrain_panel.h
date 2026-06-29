@@ -8,9 +8,10 @@
 
 struct TerrainPanel
 {
-    std::array<std::string, 2> values;
+    std::array<std::string, 4> values;
     int activeField;
     bool replaceOnNextInput;
+    bool tabPressed;
 };
 
 TerrainPanel CreateTerrainPanel();

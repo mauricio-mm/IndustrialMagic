@@ -3,15 +3,22 @@
 #include "raylib.h"
 
 #include <algorithm>
+#include <cmath>
+#include <cstdio>
 #include <cstdlib>
+#include <string>
 
 namespace
 {
 constexpr float sidebarWidth = 302.0f;
 constexpr float fieldHeight = 40.0f;
-constexpr int maximumCharacters = 3;
+constexpr int maximumCharacters = 5;
 constexpr int minimumTerrainSize = 1;
 constexpr int maximumTerrainSize = 256;
+constexpr float minimumMountainHeight = 1.0f;
+constexpr float maximumMountainHeight = 80.0f;
+constexpr float minimumLakeDepth = 0.0f;
+constexpr float maximumLakeDepth = 30.0f;
 
 constexpr Color sidebarBackground = { 244, 246, 248, 255 };
 constexpr Color sidebarBorder = { 198, 202, 208, 255 };
@@ -34,19 +41,31 @@ Rectangle GetSidebarBounds()
     };
 }
 
-std::array<Rectangle, 2> GetInputBounds()
+std::array<Rectangle, 4> GetInputBounds()
 {
     const Rectangle sidebar = GetSidebarBounds();
     return {
         Rectangle {
             sidebar.x + 110.0f,
-            122.0f,
+            108.0f,
             sidebar.width - 130.0f,
             fieldHeight
         },
         Rectangle {
             sidebar.x + 110.0f,
-            178.0f,
+            156.0f,
+            sidebar.width - 130.0f,
+            fieldHeight
+        },
+        Rectangle {
+            sidebar.x + 110.0f,
+            204.0f,
+            sidebar.width - 130.0f,
+            fieldHeight
+        },
+        Rectangle {
+            sidebar.x + 110.0f,
+            252.0f,
             sidebar.width - 130.0f,
             fieldHeight
         }
@@ -58,9 +77,42 @@ Rectangle GetApplyButtonBounds()
     const Rectangle sidebar = GetSidebarBounds();
     return {
         sidebar.x + 20.0f,
-        242.0f,
+        308.0f,
         sidebar.width - 40.0f,
         44.0f
+    };
+}
+
+Rectangle GetGenerateButtonBounds()
+{
+    const Rectangle sidebar = GetSidebarBounds();
+    return {
+        sidebar.x + 20.0f,
+        362.0f,
+        sidebar.width - 40.0f,
+        44.0f
+    };
+}
+
+Rectangle GetFlatMapButtonBounds()
+{
+    const Rectangle sidebar = GetSidebarBounds();
+    return {
+        sidebar.x + 20.0f,
+        434.0f,
+        sidebar.width - 40.0f,
+        40.0f
+    };
+}
+
+Rectangle GetWorldMapButtonBounds()
+{
+    const Rectangle sidebar = GetSidebarBounds();
+    return {
+        sidebar.x + 20.0f,
+        482.0f,
+        sidebar.width - 40.0f,
+        40.0f
     };
 }
 
@@ -82,17 +134,77 @@ int ParseTerrainSize(const std::string &value)
         maximumTerrainSize);
 }
 
+float ParseTerrainMeasure(
+    const std::string &value,
+    float minimumValue,
+    float maximumValue)
+{
+    if (value.empty())
+    {
+        return minimumValue;
+    }
+
+    return std::clamp(
+        std::strtof(value.c_str(), nullptr),
+        minimumValue,
+        maximumValue);
+}
+
+std::string FormatMeasure(float value)
+{
+    if (std::fabs(value - std::round(value)) < 0.001f)
+    {
+        return std::to_string(static_cast<int>(std::round(value)));
+    }
+
+    char buffer[16] = {};
+    std::snprintf(buffer, sizeof(buffer), "%.1f", static_cast<double>(value));
+    return buffer;
+}
+
 void ApplyTerrainSize(
     TerrainPanel *panel,
     TerrainPlane *terrain)
 {
     terrain->widthCells = ParseTerrainSize(panel->values[0]);
     terrain->heightCells = ParseTerrainSize(panel->values[1]);
-    terrain->created = true;
+    terrain->maximumHeight = ParseTerrainMeasure(
+        panel->values[2],
+        minimumMountainHeight,
+        maximumMountainHeight);
+    terrain->lakeDepth = ParseTerrainMeasure(
+        panel->values[3],
+        minimumLakeDepth,
+        maximumLakeDepth);
+    GenerateTerrainPlane(terrain);
     panel->values[0] = std::to_string(terrain->widthCells);
     panel->values[1] = std::to_string(terrain->heightCells);
+    panel->values[2] = FormatMeasure(terrain->maximumHeight);
+    panel->values[3] = FormatMeasure(terrain->lakeDepth);
     panel->activeField = -1;
     panel->replaceOnNextInput = false;
+}
+
+void GenerateNewTerrain(
+    TerrainPanel *panel,
+    TerrainPlane *terrain)
+{
+    terrain->seed += 1u;
+    ApplyTerrainSize(panel, terrain);
+}
+
+void PrepareForReplacement(TerrainPanel *panel, std::string *value)
+{
+    if (panel->replaceOnNextInput)
+    {
+        value->clear();
+        panel->replaceOnNextInput = false;
+    }
+}
+
+bool CanAppendCharacter(const std::string &value)
+{
+    return static_cast<int>(value.size()) < maximumCharacters;
 }
 
 void UpdateActiveInput(TerrainPanel *panel)
@@ -110,15 +222,23 @@ void UpdateActiveInput(TerrainPanel *panel)
     {
         if (codepoint >= '0' && codepoint <= '9')
         {
-            if (panel->replaceOnNextInput)
-            {
-                value.clear();
-                panel->replaceOnNextInput = false;
-            }
+            PrepareForReplacement(panel, &value);
 
-            if (static_cast<int>(value.size()) < maximumCharacters)
+            if (CanAppendCharacter(value))
             {
                 value.push_back(static_cast<char>(codepoint));
+            }
+        }
+        else if (
+            panel->activeField >= 2 &&
+            (codepoint == '.' || codepoint == ',') &&
+            CanAppendCharacter(value))
+        {
+            PrepareForReplacement(panel, &value);
+
+            if (value.find('.') == std::string::npos)
+            {
+                value.push_back('.');
             }
         }
 
@@ -138,12 +258,7 @@ void UpdateActiveInput(TerrainPanel *panel)
         }
     }
 
-    if (IsKeyPressed(KEY_TAB))
-    {
-        panel->activeField = (panel->activeField + 1) % 2;
-        panel->replaceOnNextInput = true;
-    }
-    else if (IsKeyPressed(KEY_ESCAPE))
+    if (IsKeyPressed(KEY_ESCAPE))
     {
         panel->activeField = -1;
         panel->replaceOnNextInput = false;
@@ -195,9 +310,10 @@ void DrawInput(
 TerrainPanel CreateTerrainPanel()
 {
     TerrainPanel panel = {};
-    panel.values = { "8", "8" };
+    panel.values = { "32", "32", "15", "4" };
     panel.activeField = -1;
     panel.replaceOnNextInput = false;
+    panel.tabPressed = false;
     return panel;
 }
 
@@ -206,17 +322,21 @@ bool UpdateTerrainPanel(
     TerrainPlane *terrain)
 {
     const Rectangle sidebar = GetSidebarBounds();
-    const std::array<Rectangle, 2> inputs = GetInputBounds();
+    const std::array<Rectangle, 4> inputs = GetInputBounds();
     const Rectangle button = GetApplyButtonBounds();
+    const Rectangle generateButton = GetGenerateButtonBounds();
+    const Rectangle flatMapButton = GetFlatMapButtonBounds();
+    const Rectangle worldMapButton = GetWorldMapButtonBounds();
     const Vector2 mousePosition = GetMousePosition();
     const bool mouseInside =
         CheckCollisionPointRec(mousePosition, sidebar);
+    panel->tabPressed = IsKeyPressed(KEY_TAB);
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
     {
         int clickedField = -1;
 
-        for (int field = 0; field < 2; ++field)
+        for (int field = 0; field < 4; ++field)
         {
             if (CheckCollisionPointRec(
                     mousePosition,
@@ -235,6 +355,18 @@ bool UpdateTerrainPanel(
         else if (CheckCollisionPointRec(mousePosition, button))
         {
             ApplyTerrainSize(panel, terrain);
+        }
+        else if (CheckCollisionPointRec(mousePosition, generateButton))
+        {
+            GenerateNewTerrain(panel, terrain);
+        }
+        else if (CheckCollisionPointRec(mousePosition, flatMapButton))
+        {
+            SetTerrainMapKind(terrain, TerrainMapKind::FlatGrid);
+        }
+        else if (CheckCollisionPointRec(mousePosition, worldMapButton))
+        {
+            SetTerrainMapKind(terrain, TerrainMapKind::LowPolyWorld);
         }
         else if (!mouseInside)
         {
@@ -258,10 +390,19 @@ void DrawTerrainPanel(
     const TerrainPlane &terrain)
 {
     const Rectangle sidebar = GetSidebarBounds();
-    const std::array<Rectangle, 2> inputs = GetInputBounds();
+    const std::array<Rectangle, 4> inputs = GetInputBounds();
     const Rectangle button = GetApplyButtonBounds();
+    const Rectangle generateButton = GetGenerateButtonBounds();
+    const Rectangle flatMapButton = GetFlatMapButtonBounds();
+    const Rectangle worldMapButton = GetWorldMapButtonBounds();
     const bool buttonHovered =
         CheckCollisionPointRec(GetMousePosition(), button);
+    const bool generateButtonHovered =
+        CheckCollisionPointRec(GetMousePosition(), generateButton);
+    const bool flatMapHovered =
+        CheckCollisionPointRec(GetMousePosition(), flatMapButton);
+    const bool worldMapHovered =
+        CheckCollisionPointRec(GetMousePosition(), worldMapButton);
 
     DrawRectangleRec(sidebar, sidebarBackground);
     DrawLine(
@@ -285,6 +426,8 @@ void DrawTerrainPanel(
 
     DrawInput(panel, 0, inputs[0], "Largura");
     DrawInput(panel, 1, inputs[1], "Altura");
+    DrawInput(panel, 2, inputs[2], "Monte m");
+    DrawInput(panel, 3, inputs[3], "Lago m");
 
     DrawRectangleRec(
         button,
@@ -299,19 +442,93 @@ void DrawTerrainPanel(
         19,
         RAYWHITE);
 
+    DrawRectangleRec(
+        generateButton,
+        generateButtonHovered ? buttonHoverColor : buttonColor);
     DrawText(
-        TextFormat(
-            "%i x %i celulas",
-            terrain.widthCells,
-            terrain.heightCells),
+        "Gerar novo",
+        static_cast<int>(
+            generateButton.x +
+            (generateButton.width - static_cast<float>(
+                MeasureText("Gerar novo", 19))) * 0.5f),
+        static_cast<int>(generateButton.y + 12.0f),
+        19,
+        RAYWHITE);
+
+    DrawText(
+        "Mapa",
         static_cast<int>(sidebar.x + 20.0f),
-        318,
+        416,
+        17,
+        textColor);
+    DrawRectangleRec(
+        flatMapButton,
+        terrain.mapKind == TerrainMapKind::FlatGrid
+            ? activeBorder
+            : (flatMapHovered ? buttonHoverColor : buttonColor));
+    DrawText(
+        "Plano",
+        static_cast<int>(
+            flatMapButton.x +
+            (flatMapButton.width - static_cast<float>(
+                MeasureText("Plano", 18))) * 0.5f),
+        static_cast<int>(flatMapButton.y + 11.0f),
+        18,
+        RAYWHITE);
+    DrawRectangleRec(
+        worldMapButton,
+        terrain.mapKind == TerrainMapKind::LowPolyWorld
+            ? activeBorder
+            : (worldMapHovered ? buttonHoverColor : buttonColor));
+    DrawText(
+        "Mundo quadrado",
+        static_cast<int>(
+            worldMapButton.x +
+            (worldMapButton.width - static_cast<float>(
+                MeasureText("Mundo quadrado", 18))) * 0.5f),
+        static_cast<int>(worldMapButton.y + 11.0f),
+        18,
+        RAYWHITE);
+
+    DrawText(
+        GetTerrainMapName(terrain),
+        static_cast<int>(sidebar.x + 20.0f),
+        554,
         17,
         textColor);
     DrawText(
-        TextFormat("Celula %.1fm", static_cast<double>(terrain.cellSize)),
+        TextFormat(
+            "Montanhas %.1fm  Lagos %.1fm",
+            static_cast<double>(terrain.maximumHeight),
+            static_cast<double>(terrain.lakeDepth)),
         static_cast<int>(sidebar.x + 20.0f),
-        344,
+        580,
+        16,
+        mutedTextColor);
+    DrawText(
+        TextFormat(
+            "Malha %s  TAB",
+            terrain.showMesh ? "ligada" : "desligada"),
+        static_cast<int>(sidebar.x + 20.0f),
+        604,
+        16,
+        mutedTextColor);
+    DrawText(
+        TextFormat(
+            "Noise %.2fx  segure R + scroll",
+            static_cast<double>(terrain.noiseScale)),
+        static_cast<int>(sidebar.x + 20.0f),
+        628,
+        16,
+        mutedTextColor);
+    DrawText(
+        TextFormat(
+            "%i x %i celulas  Seed %u",
+            terrain.widthCells,
+            terrain.heightCells,
+            terrain.seed),
+        static_cast<int>(sidebar.x + 20.0f),
+        652,
         16,
         mutedTextColor);
 }

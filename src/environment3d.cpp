@@ -99,9 +99,7 @@ void DrawEnvironment3D(const Environment3D &environment)
 {
     const float extent = static_cast<float>(environment.gridHalfSize) * environment.gridSpacing;
 
-    for (int coordinate = -environment.gridHalfSize;
-         coordinate <= environment.gridHalfSize;
-         ++coordinate)
+    for (int coordinate = -environment.gridHalfSize; coordinate <= environment.gridHalfSize; ++coordinate)
     {
         if (coordinate == 0)
         {
