@@ -16,6 +16,14 @@ enum class HalfCubeCorner
     SouthWest
 };
 
+enum class TerrainSide
+{
+    North,
+    East,
+    South,
+    West
+};
+
 struct HalfCubeConnector
 {
     HalfCubeCorner corner;
@@ -25,6 +33,7 @@ struct HalfCubeConnector
 constexpr float meshOffset = 0.034f;
 constexpr float topOffset = 0.014f;
 constexpr float waterOffset = 0.018f;
+constexpr float heightEpsilon = 0.04f;
 constexpr float minimumTerraceStep = 0.5f;
 constexpr float minimumNoiseScale = 0.45f;
 constexpr float maximumNoiseScale = 3.5f;
@@ -205,6 +214,101 @@ float GetCellHeight(
     }
 
     return terrain.cellHeights[GetCellIndex(terrain, x, z)];
+}
+
+float GetCellBottomY(
+    const TerrainPlane &terrain,
+    float bottomY,
+    int x,
+    int z)
+{
+    return std::max(
+        bottomY,
+        terrain.origin.y + GetCellHeight(terrain, x, z));
+}
+
+bool IsSideExposed(
+    const TerrainPlane &terrain,
+    int x,
+    int z,
+    float currentHeight)
+{
+    return GetCellHeight(terrain, x, z) < currentHeight - heightEpsilon;
+}
+
+bool IsTopVisibleFromCamera(
+    const Camera3D &camera,
+    float topY)
+{
+    return camera.position.y >= topY - heightEpsilon;
+}
+
+Vector3 GetSideNormal(TerrainSide side)
+{
+    switch (side)
+    {
+        case TerrainSide::North:
+            return { 0.0f, 0.0f, -1.0f };
+        case TerrainSide::East:
+            return { 1.0f, 0.0f, 0.0f };
+        case TerrainSide::South:
+            return { 0.0f, 0.0f, 1.0f };
+        case TerrainSide::West:
+            return { -1.0f, 0.0f, 0.0f };
+    }
+
+    return { 0.0f, 0.0f, 0.0f };
+}
+
+bool IsSideFacingCamera(
+    const Camera3D &camera,
+    TerrainSide side,
+    float minX,
+    float maxX,
+    float minZ,
+    float maxZ)
+{
+    Vector3 faceCenter = {};
+    switch (side)
+    {
+        case TerrainSide::North:
+            faceCenter = {
+                (minX + maxX) * 0.5f,
+                0.0f,
+                minZ
+            };
+            break;
+        case TerrainSide::East:
+            faceCenter = {
+                maxX,
+                0.0f,
+                (minZ + maxZ) * 0.5f
+            };
+            break;
+        case TerrainSide::South:
+            faceCenter = {
+                (minX + maxX) * 0.5f,
+                0.0f,
+                maxZ
+            };
+            break;
+        case TerrainSide::West:
+            faceCenter = {
+                minX,
+                0.0f,
+                (minZ + maxZ) * 0.5f
+            };
+            break;
+    }
+
+    const Vector3 normal = GetSideNormal(side);
+    const Vector3 toCamera = {
+        camera.position.x - faceCenter.x,
+        0.0f,
+        camera.position.z - faceCenter.z
+    };
+
+    return normal.x * toCamera.x + normal.z * toCamera.z > -0.001f;
 }
 
 Color GetTopColor(
@@ -405,43 +509,57 @@ void DrawVerticalFaceMesh(
     DrawMeshEdge(lowA, highA);
 }
 
-void DrawBlockMesh(
-    Vector3 northWest,
-    Vector3 northEast,
-    Vector3 southEast,
-    Vector3 southWest,
+void DrawSideMesh(
+    TerrainSide side,
+    float minX,
+    float maxX,
+    float minZ,
+    float maxZ,
+    float topY,
     float bottomY)
 {
-    const Vector3 bottomNorthWest = {
-        northWest.x,
-        bottomY,
-        northWest.z
-    };
-    const Vector3 bottomNorthEast = {
-        northEast.x,
-        bottomY,
-        northEast.z
-    };
-    const Vector3 bottomSouthEast = {
-        southEast.x,
-        bottomY,
-        southEast.z
-    };
-    const Vector3 bottomSouthWest = {
-        southWest.x,
-        bottomY,
-        southWest.z
-    };
+    switch (side)
+    {
+        case TerrainSide::North:
+            DrawVerticalFaceMesh(
+                { minX, topY, minZ },
+                { maxX, topY, minZ },
+                { maxX, bottomY, minZ },
+                { minX, bottomY, minZ });
+            break;
+        case TerrainSide::East:
+            DrawVerticalFaceMesh(
+                { maxX, topY, minZ },
+                { maxX, topY, maxZ },
+                { maxX, bottomY, maxZ },
+                { maxX, bottomY, minZ });
+            break;
+        case TerrainSide::South:
+            DrawVerticalFaceMesh(
+                { maxX, topY, maxZ },
+                { minX, topY, maxZ },
+                { minX, bottomY, maxZ },
+                { maxX, bottomY, maxZ });
+            break;
+        case TerrainSide::West:
+            DrawVerticalFaceMesh(
+                { minX, topY, maxZ },
+                { minX, topY, minZ },
+                { minX, bottomY, minZ },
+                { minX, bottomY, maxZ });
+            break;
+    }
+}
 
-    DrawTopMesh(northWest, northEast, southEast, southWest);
-    DrawMeshEdge(northWest, bottomNorthWest);
-    DrawMeshEdge(northEast, bottomNorthEast);
-    DrawMeshEdge(southEast, bottomSouthEast);
-    DrawMeshEdge(southWest, bottomSouthWest);
-    DrawMeshEdge(bottomNorthWest, bottomNorthEast);
-    DrawMeshEdge(bottomNorthEast, bottomSouthEast);
-    DrawMeshEdge(bottomSouthEast, bottomSouthWest);
-    DrawMeshEdge(bottomSouthWest, bottomNorthWest);
+void DrawOneSidedVerticalFace(
+    Vector3 highA,
+    Vector3 highB,
+    Vector3 lowB,
+    Vector3 lowA,
+    Color color)
+{
+    DrawTriangle3D(highA, highB, lowB, color);
+    DrawTriangle3D(highA, lowB, lowA, color);
 }
 
 void DrawVerticalFace(
@@ -451,8 +569,88 @@ void DrawVerticalFace(
     Vector3 lowA,
     Color color)
 {
-    DrawDoubleSidedTriangle(highA, lowA, lowB, color);
-    DrawDoubleSidedTriangle(highA, lowB, highB, color);
+    DrawOneSidedVerticalFace(highA, highB, lowB, lowA, color);
+    DrawOneSidedVerticalFace(highB, highA, lowA, lowB, color);
+}
+
+void DrawSideFace(
+    TerrainSide side,
+    float minX,
+    float maxX,
+    float minZ,
+    float maxZ,
+    float topY,
+    float bottomY,
+    Color color)
+{
+    switch (side)
+    {
+        case TerrainSide::North:
+            DrawOneSidedVerticalFace(
+                { minX, topY, minZ },
+                { maxX, topY, minZ },
+                { maxX, bottomY, minZ },
+                { minX, bottomY, minZ },
+                color);
+            break;
+        case TerrainSide::East:
+            DrawOneSidedVerticalFace(
+                { maxX, topY, minZ },
+                { maxX, topY, maxZ },
+                { maxX, bottomY, maxZ },
+                { maxX, bottomY, minZ },
+                color);
+            break;
+        case TerrainSide::South:
+            DrawOneSidedVerticalFace(
+                { maxX, topY, maxZ },
+                { minX, topY, maxZ },
+                { minX, bottomY, maxZ },
+                { maxX, bottomY, maxZ },
+                color);
+            break;
+        case TerrainSide::West:
+            DrawOneSidedVerticalFace(
+                { minX, topY, maxZ },
+                { minX, topY, minZ },
+                { minX, bottomY, minZ },
+                { minX, bottomY, maxZ },
+                color);
+            break;
+    }
+}
+
+void DrawExposedSide(
+    const Camera3D &camera,
+    TerrainSide side,
+    float minX,
+    float maxX,
+    float minZ,
+    float maxZ,
+    float topY,
+    float bottomY,
+    bool showMesh)
+{
+    if (bottomY >= topY - heightEpsilon ||
+        !IsSideFacingCamera(camera, side, minX, maxX, minZ, maxZ))
+    {
+        return;
+    }
+
+    DrawSideFace(
+        side,
+        minX,
+        maxX,
+        minZ,
+        maxZ,
+        topY,
+        bottomY,
+        sideColor);
+
+    if (showMesh)
+    {
+        DrawSideMesh(side, minX, maxX, minZ, maxZ, topY, bottomY);
+    }
 }
 
 void DrawHalfCubeConnector(
@@ -703,7 +901,9 @@ const char *GetTerrainMapName(const TerrainPlane &terrain)
     return "Terreno";
 }
 
-void DrawTerrainPlane(const TerrainPlane &terrain)
+void DrawTerrainPlane(
+    const TerrainPlane &terrain,
+    const Camera3D &camera)
 {
     if (!terrain.created || terrain.cellHeights.empty())
     {
@@ -724,17 +924,12 @@ void DrawTerrainPlane(const TerrainPlane &terrain)
         {
             const float currentHeight = GetCellHeight(terrain, x, z);
             const float lowTopY = terrain.origin.y + currentHeight;
-            const float blockHeight = std::max(0.05f, lowTopY - bottomY);
-            const Vector3 center = {
-                startX + (static_cast<float>(x) + 0.5f) * terrain.cellSize,
-                (lowTopY + bottomY) * 0.5f,
-                startZ + (static_cast<float>(z) + 0.5f) * terrain.cellSize
-            };
-
-            DrawCubeV(
-                center,
-                { terrain.cellSize, blockHeight, terrain.cellSize },
-                sideColor);
+            const float minX =
+                startX + static_cast<float>(x) * terrain.cellSize;
+            const float maxX = minX + terrain.cellSize;
+            const float minZ =
+                startZ + static_cast<float>(z) * terrain.cellSize;
+            const float maxZ = minZ + terrain.cellSize;
 
             Vector3 northWest = {};
             Vector3 northEast = {};
@@ -755,12 +950,76 @@ void DrawTerrainPlane(const TerrainPlane &terrain)
                 &southEast,
                 &southWest);
 
-            DrawQuad(
-                northWest,
-                southWest,
-                southEast,
-                northEast,
-                GetTopColor(terrain, currentHeight));
+            if (IsTopVisibleFromCamera(camera, lowTopY))
+            {
+                DrawQuad(
+                    northWest,
+                    southWest,
+                    southEast,
+                    northEast,
+                    GetTopColor(terrain, currentHeight));
+
+                if (terrain.showMesh)
+                {
+                    DrawTopMesh(northWest, northEast, southEast, southWest);
+                }
+            }
+
+            if (IsSideExposed(terrain, x, z - 1, currentHeight))
+            {
+                DrawExposedSide(
+                    camera,
+                    TerrainSide::North,
+                    minX,
+                    maxX,
+                    minZ,
+                    maxZ,
+                    lowTopY + topOffset,
+                    GetCellBottomY(terrain, bottomY, x, z - 1),
+                    terrain.showMesh);
+            }
+
+            if (IsSideExposed(terrain, x + 1, z, currentHeight))
+            {
+                DrawExposedSide(
+                    camera,
+                    TerrainSide::East,
+                    minX,
+                    maxX,
+                    minZ,
+                    maxZ,
+                    lowTopY + topOffset,
+                    GetCellBottomY(terrain, bottomY, x + 1, z),
+                    terrain.showMesh);
+            }
+
+            if (IsSideExposed(terrain, x, z + 1, currentHeight))
+            {
+                DrawExposedSide(
+                    camera,
+                    TerrainSide::South,
+                    minX,
+                    maxX,
+                    minZ,
+                    maxZ,
+                    lowTopY + topOffset,
+                    GetCellBottomY(terrain, bottomY, x, z + 1),
+                    terrain.showMesh);
+            }
+
+            if (IsSideExposed(terrain, x - 1, z, currentHeight))
+            {
+                DrawExposedSide(
+                    camera,
+                    TerrainSide::West,
+                    minX,
+                    maxX,
+                    minZ,
+                    maxZ,
+                    lowTopY + topOffset,
+                    GetCellBottomY(terrain, bottomY, x - 1, z),
+                    terrain.showMesh);
+            }
 
             const HalfCubeConnector connector =
                 GetHalfCubeConnector(terrain, x, z);
@@ -774,16 +1033,6 @@ void DrawTerrainPlane(const TerrainPlane &terrain)
                     southWest,
                     terrain.origin.y + connector.height + topOffset,
                     terrain.showMesh);
-            }
-
-            if (terrain.showMesh)
-            {
-                DrawBlockMesh(
-                    northWest,
-                    northEast,
-                    southEast,
-                    southWest,
-                    bottomY);
             }
 
             if (terrain.mapKind == TerrainMapKind::LowPolyWorld &&

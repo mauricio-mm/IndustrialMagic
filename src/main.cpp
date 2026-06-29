@@ -41,7 +41,7 @@ int main(void)
         ClearBackground(RAYWHITE);
 
         BeginMode3D(environment.camera);
-        DrawTerrainPlane(terrain);
+        DrawTerrainPlane(terrain, environment.camera);
         DrawEnvironment3D(environment);
         EndMode3D();
 

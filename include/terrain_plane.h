@@ -38,6 +38,8 @@ void SetTerrainMapKind(
     TerrainPlane *terrain,
     TerrainMapKind mapKind);
 const char *GetTerrainMapName(const TerrainPlane &terrain);
-void DrawTerrainPlane(const TerrainPlane &terrain);
+void DrawTerrainPlane(
+    const TerrainPlane &terrain,
+    const Camera3D &camera);
 
 #endif
