@@ -153,6 +153,23 @@ Rectangle GetWorldMapButtonBounds()
 }
 
 // ----------------------------
+// GetPixelShaderButtonBounds
+//
+// Calcula a area do botao que liga o shader pixel art.
+//
+// ----------------------------
+Rectangle GetPixelShaderButtonBounds()
+{
+    const Rectangle sidebar = GetSidebarBounds();
+    return {
+        sidebar.x + 20.0f,
+        542.0f,
+        sidebar.width - 40.0f,
+        40.0f
+    };
+}
+
+// ----------------------------
 // ToIndex
 //
 // Converte um indice inteiro para o tipo usado por arrays.
@@ -416,6 +433,7 @@ TerrainPanel CreateTerrainPanel()
     panel.activeField        = -1;
     panel.replaceOnNextInput = false;
     panel.tabPressed         = false;
+    panel.pixelShaderEnabled = false;
     return panel;
 }
 
@@ -435,6 +453,7 @@ bool UpdateTerrainPanel(
     const Rectangle generateButton                = GetGenerateButtonBounds();
     const Rectangle flatMapButton                 = GetFlatMapButtonBounds();
     const Rectangle worldMapButton                = GetWorldMapButtonBounds();
+    const Rectangle pixelShaderButton             = GetPixelShaderButtonBounds();
     const Vector2 mousePosition                   = GetMousePosition();
     const bool mouseInside                        =
         CheckCollisionPointRec(mousePosition, sidebar);
@@ -476,6 +495,10 @@ bool UpdateTerrainPanel(
         {
             SetTerrainMapKind(terrain, TerrainMapKind::LowPolyWorld);
         }
+        else if (CheckCollisionPointRec(mousePosition, pixelShaderButton))
+        {
+            panel->pixelShaderEnabled = !panel->pixelShaderEnabled;
+        }
         else if (!mouseInside)
         {
             panel->activeField = -1;
@@ -509,6 +532,7 @@ void DrawTerrainPanel(
     const Rectangle generateButton                = GetGenerateButtonBounds();
     const Rectangle flatMapButton                 = GetFlatMapButtonBounds();
     const Rectangle worldMapButton                = GetWorldMapButtonBounds();
+    const Rectangle pixelShaderButton             = GetPixelShaderButtonBounds();
     const bool buttonHovered                      =
         CheckCollisionPointRec(GetMousePosition(), button);
     const bool generateButtonHovered              =
@@ -517,6 +541,10 @@ void DrawTerrainPanel(
         CheckCollisionPointRec(GetMousePosition(), flatMapButton);
     const bool worldMapHovered                    =
         CheckCollisionPointRec(GetMousePosition(), worldMapButton);
+    const bool pixelShaderHovered                 =
+        CheckCollisionPointRec(GetMousePosition(), pixelShaderButton);
+    const char *pixelShaderLabel                  =
+        panel.pixelShaderEnabled ? "Pixel art ligado" : "Pixel art desligado";
 
     DrawRectangleRec(sidebar, sidebarBackground);
     DrawLine(
@@ -605,9 +633,30 @@ void DrawTerrainPanel(
         RAYWHITE);
 
     DrawText(
+        "Visual",
+        static_cast<int>(sidebar.x + 20.0f),
+        524,
+        17,
+        textColor);
+    DrawRectangleRec(
+        pixelShaderButton,
+        panel.pixelShaderEnabled
+            ? activeBorder
+            : (pixelShaderHovered ? buttonHoverColor : buttonColor));
+    DrawText(
+        pixelShaderLabel,
+        static_cast<int>(
+            pixelShaderButton.x +
+            (pixelShaderButton.width - static_cast<float>(
+                MeasureText(pixelShaderLabel, 18))) * 0.5f),
+        static_cast<int>(pixelShaderButton.y + 11.0f),
+        18,
+        RAYWHITE);
+
+    DrawText(
         GetTerrainMapName(terrain),
         static_cast<int>(sidebar.x + 20.0f),
-        554,
+        604,
         17,
         textColor);
     DrawText(
@@ -616,7 +665,7 @@ void DrawTerrainPanel(
             static_cast<double>(terrain.maximumHeight),
             static_cast<double>(terrain.lakeDepth)),
         static_cast<int>(sidebar.x + 20.0f),
-        580,
+        630,
         16,
         mutedTextColor);
     DrawText(
@@ -624,7 +673,7 @@ void DrawTerrainPanel(
             "Malha %s  TAB",
             terrain.showMesh ? "ligada" : "desligada"),
         static_cast<int>(sidebar.x + 20.0f),
-        604,
+        654,
         16,
         mutedTextColor);
     DrawText(
@@ -632,7 +681,7 @@ void DrawTerrainPanel(
             "Noise %.2fx  segure R + scroll",
             static_cast<double>(terrain.noiseScale)),
         static_cast<int>(sidebar.x + 20.0f),
-        628,
+        678,
         16,
         mutedTextColor);
     DrawText(
@@ -642,7 +691,7 @@ void DrawTerrainPanel(
             terrain.heightCells,
             terrain.seed),
         static_cast<int>(sidebar.x + 20.0f),
-        652,
+        702,
         16,
         mutedTextColor);
 }

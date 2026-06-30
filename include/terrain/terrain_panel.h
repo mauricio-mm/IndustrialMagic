@@ -12,6 +12,7 @@ struct TerrainPanel
     int activeField;
     bool replaceOnNextInput;
     bool tabPressed;
+    bool pixelShaderEnabled;
 };
 
 TerrainPanel CreateTerrainPanel();

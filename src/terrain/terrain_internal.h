@@ -40,13 +40,15 @@ constexpr float minimumNoiseScale = 0.45f;
 constexpr float maximumNoiseScale = 3.5f;
 constexpr float noiseScaleStep = 0.12f;
 
-constexpr Color topColor = { 77, 155, 79, 255 };
-constexpr Color sideColor = { 124, 82, 47, 255 };
-constexpr Color lakeBedColor = { 92, 118, 82, 255 };
-constexpr Color flatTopColor = { 126, 176, 117, 255 };
-constexpr Color meshColor = { 42, 50, 44, 220 };
-constexpr Color edgeColor = { 72, 84, 74, 255 };
-constexpr Color waterColor = { 48, 126, 184, 190 };
+constexpr Color grassLightColor  = { 168, 190, 109, 255 };
+constexpr Color grassShadowColor = { 99, 135, 118, 255 };
+constexpr Color topColor         = { 168, 190, 109, 255 };
+constexpr Color sideColor        = { 124, 82, 47, 255 };
+constexpr Color lakeBedColor     = { 92, 118, 82, 255 };
+constexpr Color flatTopColor     = { 168, 190, 109, 255 };
+constexpr Color meshColor        = { 42, 50, 44, 220 };
+constexpr Color edgeColor        = { 72, 84, 74, 255 };
+constexpr Color waterColor       = { 48, 126, 184, 190 };
 
 std::size_t GetCellIndex(
     const TerrainPlane &terrain,
@@ -77,6 +79,8 @@ bool IsTopVisibleFromCamera(
     float topY);
 Color GetTopColor(
     const TerrainPlane &terrain,
+    int x,
+    int z,
     float height);
 void GetCellCorners(
     float startX,

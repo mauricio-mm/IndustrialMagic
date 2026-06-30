@@ -33,6 +33,24 @@ bool IsTopVisibleFromCamera(
 }
 
 // ----------------------------
+// IsGrassShadowed
+//
+// Verifica se vizinhos mais altos bloqueiam o sol sobre a grama.
+//
+// ----------------------------
+bool IsGrassShadowed(
+    const TerrainPlane &terrain,
+    int x,
+    int z,
+    float currentHeight)
+{
+    const float shadowRise = GetTerraceStep(terrain) * 0.45f;
+    return GetCellHeight(terrain, x - 1, z) > currentHeight + shadowRise ||
+        GetCellHeight(terrain, x, z - 1) > currentHeight + shadowRise ||
+        GetCellHeight(terrain, x - 1, z - 1) > currentHeight + shadowRise;
+}
+
+// ----------------------------
 // GetTopColor
 //
 // Escolhe a cor do topo entre grama, leito de lago e plano.
@@ -40,11 +58,13 @@ bool IsTopVisibleFromCamera(
 // ----------------------------
 Color GetTopColor(
     const TerrainPlane &terrain,
+    int x,
+    int z,
     float height)
 {
     if (terrain.mapKind == TerrainMapKind::FlatGrid)
     {
-        return flatTopColor;
+        return grassLightColor;
     }
 
     if (height <= terrain.waterLevel + 0.03f)
@@ -52,7 +72,9 @@ Color GetTopColor(
         return lakeBedColor;
     }
 
-    return topColor;
+    return IsGrassShadowed(terrain, x, z, height)
+        ? grassShadowColor
+        : grassLightColor;
 }
 
 // ----------------------------

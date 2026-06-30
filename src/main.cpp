@@ -1,4 +1,5 @@
 #include "environment3d.h"
+#include "pixel_art_shader.h"
 #include "raylib.h"
 #include "terrain/terrain_panel.h"
 #include "terrain/terrain_plane.h"
@@ -18,10 +19,13 @@ int main(void)
     InitWindow(1280, 720, "IndustrialMagic");
     SetTargetFPS(60);
 
-    Environment3D environment = CreateEnvironment3D();
-    TerrainPlane terrain      = CreateTerrainPlane();
-    TerrainPanel terrainPanel = CreateTerrainPanel();
-    
+    Environment3D environment  = CreateEnvironment3D();
+    TerrainPlane terrain       = CreateTerrainPlane();
+    TerrainPanel terrainPanel  = CreateTerrainPanel();
+    PixelArtShader pixelArt    = CreatePixelArtShader(
+        GetScreenWidth(),
+        GetScreenHeight());
+
     InitEnvironment3D();
 
     while (!WindowShouldClose())
@@ -43,19 +47,32 @@ int main(void)
             &environment,
             terrainPanelCapturesInput || editingNoiseScale);
 
-        BeginDrawing();
+        if (IsWindowResized())
+        {
+            ResizePixelArtShader(
+                &pixelArt,
+                GetScreenWidth(),
+                GetScreenHeight());
+        }
+
+        BeginPixelArtScene(pixelArt);
         DrawSkyBackground();
 
         BeginMode3D(environment.camera);
         DrawTerrainPlane(terrain, environment.camera);
         DrawEnvironment3D(environment);
         EndMode3D();
+        EndPixelArtScene();
 
+        BeginDrawing();
+        ClearBackground(BLACK);
+        DrawPixelArtScene(&pixelArt, terrainPanel.pixelShaderEnabled);
         DrawTerrainPanel(terrainPanel, terrain);
 
         EndDrawing();
     }
 
+    ShutdownPixelArtShader(&pixelArt);
     ShutdownEnvironment3D();
     CloseWindow();
     return 0;

@@ -1,9 +1,130 @@
 #include "terrain_internal.h"
 
+#include "raymath.h"
+
+#include <algorithm>
+
 namespace terrain_internal
 {
 namespace
 {
+constexpr float ambientSunLight = 0.48f;
+constexpr float directSunLight  = 0.58f;
+
+// ----------------------------
+// GetSunDirection
+//
+// Retorna a direcao usada para iluminar o terreno como luz do sol.
+//
+// ----------------------------
+Vector3 GetSunDirection()
+{
+    return Vector3Normalize({ -0.52f, 0.82f, -0.24f });
+}
+
+// ----------------------------
+// ScaleColorChannel
+//
+// Ajusta um canal de cor pela intensidade calculada da luz.
+//
+// ----------------------------
+unsigned char ScaleColorChannel(
+    unsigned char value,
+    float intensity)
+{
+    const int scaledValue = static_cast<int>(
+        static_cast<float>(value) * intensity);
+    return static_cast<unsigned char>(std::clamp(scaledValue, 0, 255));
+}
+
+// ----------------------------
+// ApplySunLighting
+//
+// Aplica luz ambiente e luz direcional do sol a uma cor base.
+//
+// ----------------------------
+Color ApplySunLighting(
+    Color color,
+    Vector3 normal)
+{
+    const Vector3 surfaceNormal = Vector3Normalize(normal);
+    const float sunAmount       = std::max(
+        0.0f,
+        Vector3DotProduct(surfaceNormal, GetSunDirection()));
+    const float intensity       = ambientSunLight + sunAmount * directSunLight;
+
+    return {
+        ScaleColorChannel(color.r, intensity),
+        ScaleColorChannel(color.g, intensity),
+        ScaleColorChannel(color.b, intensity),
+        color.a
+    };
+}
+
+// ----------------------------
+// ColorsMatch
+//
+// Compara duas cores incluindo transparencia.
+//
+// ----------------------------
+bool ColorsMatch(
+    Color first,
+    Color second)
+{
+    return first.r == second.r &&
+        first.g == second.g &&
+        first.b == second.b &&
+        first.a == second.a;
+}
+
+// ----------------------------
+// IsGrassColor
+//
+// Identifica as cores de grama que ja carregam luz e sombra proprias.
+//
+// ----------------------------
+bool IsGrassColor(Color color)
+{
+    return ColorsMatch(color, grassLightColor) ||
+        ColorsMatch(color, grassShadowColor) ||
+        ColorsMatch(color, flatTopColor);
+}
+
+// ----------------------------
+// ApplySurfaceLighting
+//
+// Mantem a paleta da grama e aplica luz comum nas outras superficies.
+//
+// ----------------------------
+Color ApplySurfaceLighting(
+    Color color,
+    Vector3 normal)
+{
+    if (IsGrassColor(color))
+    {
+        return color;
+    }
+
+    return ApplySunLighting(color, normal);
+}
+
+// ----------------------------
+// GetFaceNormal
+//
+// Calcula a normal de uma face a partir de tres vertices.
+//
+// ----------------------------
+Vector3 GetFaceNormal(
+    Vector3 a,
+    Vector3 b,
+    Vector3 c)
+{
+    return Vector3Normalize(
+        Vector3CrossProduct(
+            Vector3Subtract(b, a),
+            Vector3Subtract(c, a)));
+}
+
 // ----------------------------
 // Raise
 //
@@ -29,8 +150,12 @@ void DrawQuad(
     Vector3 d,
     Color color)
 {
-    DrawTriangle3D(a, b, c, color);
-    DrawTriangle3D(a, c, d, color);
+    const Color litColor = ApplySurfaceLighting(
+        color,
+        { 0.0f, 1.0f, 0.0f });
+
+    DrawTriangle3D(a, b, c, litColor);
+    DrawTriangle3D(a, c, d, litColor);
 }
 
 // ----------------------------
@@ -45,8 +170,12 @@ void DrawDoubleSidedTriangle(
     Vector3 c,
     Color color)
 {
-    DrawTriangle3D(a, b, c, color);
-    DrawTriangle3D(a, c, b, color);
+    const Color litColor = ApplySurfaceLighting(
+        color,
+        { 0.0f, 1.0f, 0.0f });
+
+    DrawTriangle3D(a, b, c, litColor);
+    DrawTriangle3D(a, c, b, litColor);
 }
 
 // ----------------------------
@@ -257,8 +386,12 @@ void DrawVerticalFace(
     Vector3 lowA,
     Color color)
 {
-    DrawOneSidedVerticalFace(highA, highB, lowB, lowA, color);
-    DrawOneSidedVerticalFace(highB, highA, lowA, lowB, color);
+    const Color litColor = ApplySunLighting(
+        color,
+        GetFaceNormal(highA, highB, lowB));
+
+    DrawOneSidedVerticalFace(highA, highB, lowB, lowA, litColor);
+    DrawOneSidedVerticalFace(highB, highA, lowA, lowB, litColor);
 }
 
 // ----------------------------
@@ -277,6 +410,8 @@ void DrawSideFace(
     float bottomY,
     Color color)
 {
+    const Color litColor = ApplySunLighting(color, GetSideNormal(side));
+
     switch (side)
     {
         case TerrainSide::North:
@@ -285,7 +420,7 @@ void DrawSideFace(
                 { maxX, topY, minZ },
                 { maxX, bottomY, minZ },
                 { minX, bottomY, minZ },
-                color);
+                litColor);
             break;
         case TerrainSide::East:
             DrawOneSidedVerticalFace(
@@ -293,7 +428,7 @@ void DrawSideFace(
                 { maxX, topY, maxZ },
                 { maxX, bottomY, maxZ },
                 { maxX, bottomY, minZ },
-                color);
+                litColor);
             break;
         case TerrainSide::South:
             DrawOneSidedVerticalFace(
@@ -301,7 +436,7 @@ void DrawSideFace(
                 { minX, topY, maxZ },
                 { minX, bottomY, maxZ },
                 { maxX, bottomY, maxZ },
-                color);
+                litColor);
             break;
         case TerrainSide::West:
             DrawOneSidedVerticalFace(
@@ -309,7 +444,7 @@ void DrawSideFace(
                 { minX, topY, minZ },
                 { minX, bottomY, minZ },
                 { minX, bottomY, maxZ },
-                color);
+                litColor);
             break;
     }
 }
@@ -546,7 +681,7 @@ void DrawWaterTile(
             startZ + (static_cast<float>(z) + 0.5f) * cellSize
         },
         { cellSize, cellSize },
-        waterColor);
+        ApplySunLighting(waterColor, { 0.0f, 1.0f, 0.0f }));
 }
 
 } // namespace terrain_internal

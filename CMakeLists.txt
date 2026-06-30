@@ -16,6 +16,7 @@ set_target_properties(raylib PROPERTIES
 add_executable(IndustrialMagic
     src/main.cpp
     src/environment3d.cpp
+    src/pixel_art_shader.cpp
     src/terrain/terrain_draw.cpp
     src/terrain/terrain_geometry.cpp
     src/terrain/terrain_noise.cpp

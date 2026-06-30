@@ -59,7 +59,11 @@ void DrawTerrainPlane(
                     northEast,
                     southEast,
                     southWest,
-                    terrain_internal::GetTopColor(terrain, currentHeight));
+                    terrain_internal::GetTopColor(
+                        terrain,
+                        x,
+                        z,
+                        currentHeight));
 
                 if (terrain.showMesh)
                 {
