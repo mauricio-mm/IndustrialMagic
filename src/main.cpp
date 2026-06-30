@@ -3,6 +3,7 @@
 #include "raylib.h"
 #include "terrain/terrain_panel.h"
 #include "terrain/terrain_plane.h"
+#include "three/procedural_forest.h"
 
 // ----------------------------
 // main
@@ -22,6 +23,7 @@ int main(void)
     Environment3D environment  = CreateEnvironment3D();
     TerrainPlane terrain       = CreateTerrainPlane();
     TerrainPanel terrainPanel  = CreateTerrainPanel();
+    ProceduralForest forest    = CreateProceduralForest();
     PixelArtShader pixelArt    = CreatePixelArtShader(
         GetScreenWidth(),
         GetScreenHeight());
@@ -46,6 +48,7 @@ int main(void)
         UpdateEnvironment3D(
             &environment,
             terrainPanelCapturesInput || editingNoiseScale);
+        UpdateProceduralForest(&forest, terrain);
 
         if (IsWindowResized())
         {
@@ -60,6 +63,7 @@ int main(void)
 
         BeginMode3D(environment.camera);
         DrawTerrainPlane(terrain, environment.camera);
+        DrawProceduralForest(forest);
         DrawEnvironment3D(environment);
         EndMode3D();
         EndPixelArtScene();

@@ -17,6 +17,7 @@ add_executable(IndustrialMagic
     src/main.cpp
     src/environment3d.cpp
     src/pixel_art_shader.cpp
+    src/three/procedural_forest.cpp
     src/terrain/terrain_draw.cpp
     src/terrain/terrain_geometry.cpp
     src/terrain/terrain_noise.cpp
