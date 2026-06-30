@@ -47,6 +47,8 @@ ProceduralForest CreateProceduralForest();
 void UpdateProceduralForest(
     ProceduralForest *forest,
     const TerrainPlane &terrain);
-void DrawProceduralForest(const ProceduralForest &forest);
+void DrawProceduralForest(
+    const ProceduralForest &forest,
+    bool showMesh);
 
 #endif

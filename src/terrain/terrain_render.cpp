@@ -1,6 +1,117 @@
 #include "terrain_internal.h"
 #include "terrain/terrain_plane.h"
 
+namespace
+{
+// ----------------------------
+// IsWaterCell
+//
+// Verifica se uma celula fica abaixo do nivel do lago.
+//
+// ----------------------------
+bool IsWaterCell(
+    const TerrainPlane &terrain,
+    int x,
+    int z)
+{
+    if (
+        x < 0 ||
+        z < 0 ||
+        x >= terrain.widthCells ||
+        z >= terrain.heightCells)
+    {
+        return false;
+    }
+
+    return terrain.mapKind == TerrainMapKind::LowPolyWorld &&
+        terrain_internal::GetCellHeight(terrain, x, z) <
+            terrain.waterLevel - terrain_internal::heightEpsilon;
+}
+
+// ----------------------------
+// GetWaterEdgeMask
+//
+// Marca quais lados do tile de agua encostam em terra.
+//
+// ----------------------------
+Vector4 GetWaterEdgeMask(
+    const TerrainPlane &terrain,
+    int x,
+    int z)
+{
+    return {
+        IsWaterCell(terrain, x, z - 1) ? 0.0f : 1.0f,
+        IsWaterCell(terrain, x + 1, z) ? 0.0f : 1.0f,
+        IsWaterCell(terrain, x, z + 1) ? 0.0f : 1.0f,
+        IsWaterCell(terrain, x - 1, z) ? 0.0f : 1.0f
+    };
+}
+
+// ----------------------------
+// GetWaterLandCorner
+//
+// Retorna qual meio-bloco de terra deve recortar a agua.
+//
+// ----------------------------
+terrain_internal::HalfCubeCorner GetWaterLandCorner(
+    const TerrainPlane &terrain,
+    int x,
+    int z)
+{
+    const terrain_internal::HalfCubeConnector connector =
+        terrain_internal::GetHalfCubeConnector(terrain, x, z);
+
+    if (
+        connector.corner == terrain_internal::HalfCubeCorner::None ||
+        connector.height <= terrain.waterLevel + terrain_internal::heightEpsilon)
+    {
+        return terrain_internal::HalfCubeCorner::None;
+    }
+
+    return connector.corner;
+}
+
+// ----------------------------
+// DrawTerrainWater
+//
+// Desenha a agua depois das faces opacas para melhorar transparencia.
+//
+// ----------------------------
+void DrawTerrainWater(
+    const TerrainPlane &terrain,
+    float startX,
+    float startZ,
+    const LakeWaterShader *lakeWater)
+{
+    if (terrain.mapKind != TerrainMapKind::LowPolyWorld)
+    {
+        return;
+    }
+
+    for (int z = 0; z < terrain.heightCells; ++z)
+    {
+        for (int x = 0; x < terrain.widthCells; ++x)
+        {
+            if (!IsWaterCell(terrain, x, z))
+            {
+                continue;
+            }
+
+            terrain_internal::DrawWaterTile(
+                startX,
+                startZ,
+                terrain.cellSize,
+                x,
+                z,
+                terrain.origin.y + terrain.waterLevel,
+                GetWaterEdgeMask(terrain, x, z),
+                GetWaterLandCorner(terrain, x, z),
+                lakeWater);
+        }
+    }
+}
+}
+
 // ----------------------------
 // DrawTerrainPlane
 //
@@ -9,7 +120,8 @@
 // ----------------------------
 void DrawTerrainPlane(
     const TerrainPlane &terrain,
-    const Camera3D &camera)
+    const Camera3D &camera,
+    const LakeWaterShader *lakeWater)
 {
     if (!terrain.created || terrain.cellHeights.empty())
     {
@@ -178,19 +290,10 @@ void DrawTerrainPlane(
                     terrain.showMesh);
             }
 
-            if (terrain.mapKind == TerrainMapKind::LowPolyWorld &&
-                lowTopY < terrain.origin.y + terrain.waterLevel)
-            {
-                terrain_internal::DrawWaterTile(
-                    startX,
-                    startZ,
-                    terrain.cellSize,
-                    x,
-                    z,
-                    terrain.origin.y + terrain.waterLevel);
-            }
         }
     }
+
+    DrawTerrainWater(terrain, startX, startZ, lakeWater);
 
     DrawLine3D(
         { startX, terrain.origin.y + terrain_internal::meshOffset, startZ },

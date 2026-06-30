@@ -14,14 +14,15 @@ constexpr float minimumTreeClearance = 0.18f;
 constexpr int maximumTreeCount       = 220;
 constexpr int trunkSides             = 6;
 constexpr int branchSides            = 5;
-constexpr int leafRings              = 5;
-constexpr int leafSlices             = 7;
+constexpr int leafRings              = 4;
+constexpr int leafSlices             = 6;
 
-constexpr Color trunkColor      = { 91, 58, 36, 255 };
-constexpr Color branchColor     = { 77, 48, 31, 255 };
-constexpr Color leafLightColor  = { 110, 150, 82, 255 };
-constexpr Color leafMidColor    = { 82, 126, 76, 255 };
-constexpr Color leafShadowColor = { 63, 96, 69, 255 };
+constexpr Color trunkColor      = { 126, 83, 54, 255 };
+constexpr Color branchColor     = { 96, 61, 41, 255 };
+constexpr Color leafLightColor  = { 119, 154, 83, 255 };
+constexpr Color leafMidColor    = { 84, 130, 72, 255 };
+constexpr Color leafShadowColor = { 61, 96, 67, 255 };
+constexpr Color treeMeshColor   = { 31, 48, 36, 220 };
 
 struct TreeCandidate
 {
@@ -341,16 +342,16 @@ ProceduralTree CreateTree(
         x,
         z,
         30,
-        terrain.cellSize * 0.055f,
-        terrain.cellSize * 0.095f);
+        terrain.cellSize * 0.12f,
+        terrain.cellSize * 0.18f);
 
     const float trunkHeight = RandomRange(
         terrain.seed,
         x,
         z,
         31,
-        terrain.cellSize * 1.55f,
-        terrain.cellSize * 2.55f);
+        terrain.cellSize * 1.15f,
+        terrain.cellSize * 1.85f);
     const float leanX       = RandomRange(
         terrain.seed,
         x,
@@ -372,7 +373,7 @@ ProceduralTree CreateTree(
         tree.trunkStart.z + leanZ
     };
 
-    const int branchCount = 3 + static_cast<int>(
+    const int branchCount = 2 + static_cast<int>(
         HashCell(terrain.seed, x, z, 34) % 3u);
 
     for (int branch = 0; branch < branchCount; ++branch)
@@ -393,8 +394,8 @@ ProceduralTree CreateTree(
             x,
             z,
             50 + branch,
-            terrain.cellSize * 0.45f,
-            terrain.cellSize * 0.82f);
+            terrain.cellSize * 0.34f,
+            terrain.cellSize * 0.64f);
         const Vector3 start     = {
             tree.trunkStart.x +
                 (tree.trunkEnd.x - tree.trunkStart.x) * branchRatio,
@@ -409,8 +410,8 @@ ProceduralTree CreateTree(
                 x,
                 z,
                 60 + branch,
-                terrain.cellSize * 0.15f,
-                terrain.cellSize * 0.36f),
+                terrain.cellSize * 0.08f,
+                terrain.cellSize * 0.28f),
             start.z + std::sin(angle) * length
         };
 
@@ -418,8 +419,8 @@ ProceduralTree CreateTree(
             &tree,
             start,
             end,
-            tree.trunkRadius * 0.62f,
-            tree.trunkRadius * 0.24f);
+            tree.trunkRadius * 0.72f,
+            tree.trunkRadius * 0.34f);
         AddLeaf(
             &tree,
             end,
@@ -428,8 +429,8 @@ ProceduralTree CreateTree(
                 x,
                 z,
                 70 + branch,
-                terrain.cellSize * 0.35f,
-                terrain.cellSize * 0.54f),
+                terrain.cellSize * 0.48f,
+                terrain.cellSize * 0.72f),
             GetLeafColor(terrain.seed, x, z, 80 + branch));
     }
 
@@ -445,8 +446,8 @@ ProceduralTree CreateTree(
             x,
             z,
             90,
-            terrain.cellSize * 0.48f,
-            terrain.cellSize * 0.66f),
+            terrain.cellSize * 0.68f,
+            terrain.cellSize * 0.92f),
         GetLeafColor(terrain.seed, x, z, 91));
 
     return tree;
@@ -539,15 +540,27 @@ std::vector<TreeCandidate> CollectTreeCandidates(const TerrainPlane &terrain)
 // Desenha tronco, galhos e esferas de folhas de uma arvore.
 //
 // ----------------------------
-void DrawTree(const ProceduralTree &tree)
+void DrawTree(
+    const ProceduralTree &tree,
+    bool showMesh)
 {
     DrawCylinderEx(
         tree.trunkStart,
         tree.trunkEnd,
         tree.trunkRadius,
-        tree.trunkRadius * 0.58f,
+        tree.trunkRadius * 0.7f,
         trunkSides,
         trunkColor);
+    if (showMesh)
+    {
+        DrawCylinderWiresEx(
+            tree.trunkStart,
+            tree.trunkEnd,
+            tree.trunkRadius,
+            tree.trunkRadius * 0.7f,
+            trunkSides,
+            treeMeshColor);
+    }
 
     for (const ProceduralBranch &branch : tree.branches)
     {
@@ -558,6 +571,16 @@ void DrawTree(const ProceduralTree &tree)
             branch.endRadius,
             branchSides,
             branchColor);
+        if (showMesh)
+        {
+            DrawCylinderWiresEx(
+                branch.start,
+                branch.end,
+                branch.startRadius,
+                branch.endRadius,
+                branchSides,
+                treeMeshColor);
+        }
     }
 
     for (const ProceduralLeaf &leaf : tree.leaves)
@@ -568,6 +591,15 @@ void DrawTree(const ProceduralTree &tree)
             leafRings,
             leafSlices,
             leaf.color);
+        if (showMesh)
+        {
+            DrawSphereWires(
+                leaf.center,
+                leaf.radius,
+                leafRings,
+                leafSlices,
+                treeMeshColor);
+        }
     }
 }
 }
@@ -643,10 +675,12 @@ void UpdateProceduralForest(
 // Desenha todas as arvores procedurais da floresta.
 //
 // ----------------------------
-void DrawProceduralForest(const ProceduralForest &forest)
+void DrawProceduralForest(
+    const ProceduralForest &forest,
+    bool showMesh)
 {
     for (const ProceduralTree &tree : forest.trees)
     {
-        DrawTree(tree);
+        DrawTree(tree, showMesh);
     }
 }

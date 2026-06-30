@@ -1,6 +1,8 @@
 #include "terrain_internal.h"
 
+#include "lake_water_shader.h"
 #include "raymath.h"
+#include "rlgl.h"
 
 #include <algorithm>
 
@@ -10,6 +12,14 @@ namespace
 {
 constexpr float ambientSunLight = 0.48f;
 constexpr float directSunLight  = 0.58f;
+constexpr float waterEdgeLineOffset = 0.026f;
+constexpr Color waterEdgeHighlightColor = { 238, 247, 238, 210 };
+
+struct WaterVertex
+{
+    Vector3 position;
+    Vector2 uv;
+};
 
 // ----------------------------
 // GetSunDirection
@@ -448,6 +458,180 @@ void DrawSideFace(
             break;
     }
 }
+
+// ----------------------------
+// DrawWaterEdgeHighlights
+//
+// Desenha reflexos brancos nas bordas onde agua encosta em terra.
+//
+// ----------------------------
+void DrawWaterEdgeHighlights(
+    float minX,
+    float maxX,
+    float minZ,
+    float maxZ,
+    float y,
+    Vector4 edgeMask)
+{
+    if (edgeMask.x > 0.5f)
+    {
+        DrawLine3D(
+            { minX, y, minZ },
+            { maxX, y, minZ },
+            waterEdgeHighlightColor);
+    }
+
+    if (edgeMask.y > 0.5f)
+    {
+        DrawLine3D(
+            { maxX, y, minZ },
+            { maxX, y, maxZ },
+            waterEdgeHighlightColor);
+    }
+
+    if (edgeMask.z > 0.5f)
+    {
+        DrawLine3D(
+            { maxX, y, maxZ },
+            { minX, y, maxZ },
+            waterEdgeHighlightColor);
+    }
+
+    if (edgeMask.w > 0.5f)
+    {
+        DrawLine3D(
+            { minX, y, maxZ },
+            { minX, y, minZ },
+            waterEdgeHighlightColor);
+    }
+}
+
+// ----------------------------
+// DrawWaterDiagonalHighlight
+//
+// Desenha o reflexo branco na diagonal de um meio-bloco de terra.
+//
+// ----------------------------
+void DrawWaterDiagonalHighlight(
+    float minX,
+    float maxX,
+    float minZ,
+    float maxZ,
+    float y,
+    HalfCubeCorner landCorner)
+{
+    if (
+        landCorner == HalfCubeCorner::NorthWest ||
+        landCorner == HalfCubeCorner::SouthEast)
+    {
+        DrawLine3D(
+            { maxX, y, minZ },
+            { minX, y, maxZ },
+            waterEdgeHighlightColor);
+    }
+    else if (
+        landCorner == HalfCubeCorner::NorthEast ||
+        landCorner == HalfCubeCorner::SouthWest)
+    {
+        DrawLine3D(
+            { minX, y, minZ },
+            { maxX, y, maxZ },
+            waterEdgeHighlightColor);
+    }
+}
+
+// ----------------------------
+// GetEffectiveWaterEdgeMask
+//
+// Remove bordas que pertencem ao meio-bloco de terra dentro do tile.
+//
+// ----------------------------
+Vector4 GetEffectiveWaterEdgeMask(
+    Vector4 edgeMask,
+    HalfCubeCorner landCorner)
+{
+    switch (landCorner)
+    {
+        case HalfCubeCorner::NorthWest:
+            edgeMask.x = 0.0f;
+            edgeMask.w = 0.0f;
+            break;
+        case HalfCubeCorner::NorthEast:
+            edgeMask.x = 0.0f;
+            edgeMask.y = 0.0f;
+            break;
+        case HalfCubeCorner::SouthEast:
+            edgeMask.y = 0.0f;
+            edgeMask.z = 0.0f;
+            break;
+        case HalfCubeCorner::SouthWest:
+            edgeMask.z = 0.0f;
+            edgeMask.w = 0.0f;
+            break;
+        case HalfCubeCorner::None:
+            break;
+    }
+
+    return edgeMask;
+}
+
+// ----------------------------
+// DrawWaterTriangle
+//
+// Desenha um triangulo de agua com UV global continuo.
+//
+// ----------------------------
+void DrawWaterTriangle(
+    WaterVertex a,
+    WaterVertex b,
+    WaterVertex c,
+    Color color)
+{
+    rlBegin(RL_TRIANGLES);
+    rlColor4ub(color.r, color.g, color.b, color.a);
+    rlTexCoord2f(a.uv.x, a.uv.y);
+    rlVertex3f(a.position.x, a.position.y, a.position.z);
+    rlTexCoord2f(b.uv.x, b.uv.y);
+    rlVertex3f(b.position.x, b.position.y, b.position.z);
+    rlTexCoord2f(c.uv.x, c.uv.y);
+    rlVertex3f(c.position.x, c.position.y, c.position.z);
+    rlEnd();
+}
+
+// ----------------------------
+// DrawWaterShape
+//
+// Desenha o tile inteiro ou o triangulo restante ao encontrar meio-bloco.
+//
+// ----------------------------
+void DrawWaterShape(
+    WaterVertex northWest,
+    WaterVertex northEast,
+    WaterVertex southEast,
+    WaterVertex southWest,
+    HalfCubeCorner landCorner,
+    Color color)
+{
+    switch (landCorner)
+    {
+        case HalfCubeCorner::NorthWest:
+            DrawWaterTriangle(northEast, southWest, southEast, color);
+            break;
+        case HalfCubeCorner::NorthEast:
+            DrawWaterTriangle(northWest, southWest, southEast, color);
+            break;
+        case HalfCubeCorner::SouthEast:
+            DrawWaterTriangle(northWest, southWest, northEast, color);
+            break;
+        case HalfCubeCorner::SouthWest:
+            DrawWaterTriangle(northWest, southEast, northEast, color);
+            break;
+        case HalfCubeCorner::None:
+            DrawWaterTriangle(northWest, southWest, southEast, color);
+            DrawWaterTriangle(northWest, southEast, northEast, color);
+            break;
+    }
+}
 }
 
 // ----------------------------
@@ -672,16 +856,74 @@ void DrawWaterTile(
     float cellSize,
     int x,
     int z,
-    float waterY)
+    float waterY,
+    Vector4 edgeMask,
+    HalfCubeCorner landCorner,
+    const LakeWaterShader *lakeWater)
 {
-    DrawPlane(
-        {
-            startX + (static_cast<float>(x) + 0.5f) * cellSize,
-            waterY + waterOffset,
-            startZ + (static_cast<float>(z) + 0.5f) * cellSize
-        },
-        { cellSize, cellSize },
-        ApplySunLighting(waterColor, { 0.0f, 1.0f, 0.0f }));
+    const float minX         = startX + static_cast<float>(x) * cellSize;
+    const float maxX         = minX + cellSize;
+    const float minZ         = startZ + static_cast<float>(z) * cellSize;
+    const float maxZ         = minZ + cellSize;
+    const float waterTopY    = waterY + waterOffset;
+    const Vector4 shaderMask = GetEffectiveWaterEdgeMask(edgeMask, landCorner);
+
+    const WaterVertex northWest = {
+        { minX, waterTopY, minZ },
+        { static_cast<float>(x), static_cast<float>(z) }
+    };
+    const WaterVertex northEast = {
+        { maxX, waterTopY, minZ },
+        { static_cast<float>(x + 1), static_cast<float>(z) }
+    };
+    const WaterVertex southEast = {
+        { maxX, waterTopY, maxZ },
+        { static_cast<float>(x + 1), static_cast<float>(z + 1) }
+    };
+    const WaterVertex southWest = {
+        { minX, waterTopY, maxZ },
+        { static_cast<float>(x), static_cast<float>(z + 1) }
+    };
+
+    if (lakeWater != nullptr && lakeWater->ready)
+    {
+        BeginLakeWaterShader(
+            lakeWater,
+            shaderMask);
+        DrawWaterShape(
+            northWest,
+            northEast,
+            southEast,
+            southWest,
+            landCorner,
+            WHITE);
+        EndLakeWaterShader(lakeWater);
+    }
+    else
+    {
+        DrawWaterShape(
+            northWest,
+            northEast,
+            southEast,
+            southWest,
+            landCorner,
+            ApplySunLighting(waterColor, { 0.0f, 1.0f, 0.0f }));
+    }
+
+    DrawWaterEdgeHighlights(
+        minX,
+        maxX,
+        minZ,
+        maxZ,
+        waterTopY + waterEdgeLineOffset,
+        shaderMask);
+    DrawWaterDiagonalHighlight(
+        minX,
+        maxX,
+        minZ,
+        maxZ,
+        waterTopY + waterEdgeLineOffset,
+        landCorner);
 }
 
 } // namespace terrain_internal

@@ -1,9 +1,11 @@
 #include "environment3d.h"
+#include "lake_water_shader.h"
 #include "pixel_art_shader.h"
 #include "raylib.h"
 #include "terrain/terrain_panel.h"
 #include "terrain/terrain_plane.h"
 #include "three/procedural_forest.h"
+#include "three/procedural_rocks.h"
 
 // ----------------------------
 // main
@@ -24,6 +26,8 @@ int main(void)
     TerrainPlane terrain       = CreateTerrainPlane();
     TerrainPanel terrainPanel  = CreateTerrainPanel();
     ProceduralForest forest    = CreateProceduralForest();
+    ProceduralRocks rocks      = CreateProceduralRocks();
+    LakeWaterShader lakeWater  = CreateLakeWaterShader();
     PixelArtShader pixelArt    = CreatePixelArtShader(
         GetScreenWidth(),
         GetScreenHeight());
@@ -49,6 +53,10 @@ int main(void)
             &environment,
             terrainPanelCapturesInput || editingNoiseScale);
         UpdateProceduralForest(&forest, terrain);
+        UpdateProceduralRocks(&rocks, terrain);
+        UpdateLakeWaterShader(
+            &lakeWater,
+            static_cast<float>(GetTime()));
 
         if (IsWindowResized())
         {
@@ -62,8 +70,9 @@ int main(void)
         DrawSkyBackground();
 
         BeginMode3D(environment.camera);
-        DrawTerrainPlane(terrain, environment.camera);
-        DrawProceduralForest(forest);
+        DrawTerrainPlane(terrain, environment.camera, &lakeWater);
+        DrawProceduralRocks(rocks, terrain.showMesh);
+        DrawProceduralForest(forest, terrain.showMesh);
         DrawEnvironment3D(environment);
         EndMode3D();
         EndPixelArtScene();
@@ -77,6 +86,7 @@ int main(void)
     }
 
     ShutdownPixelArtShader(&pixelArt);
+    ShutdownLakeWaterShader(&lakeWater);
     ShutdownEnvironment3D();
     CloseWindow();
     return 0;

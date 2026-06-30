@@ -5,6 +5,8 @@
 
 #include <vector>
 
+struct LakeWaterShader;
+
 enum class TerrainMapKind
 {
     FlatGrid,
@@ -40,6 +42,7 @@ void SetTerrainMapKind(
 const char *GetTerrainMapName(const TerrainPlane &terrain);
 void DrawTerrainPlane(
     const TerrainPlane &terrain,
-    const Camera3D &camera);
+    const Camera3D &camera,
+    const LakeWaterShader *lakeWater);
 
 #endif

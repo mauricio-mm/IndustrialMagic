@@ -6,6 +6,8 @@
 
 #include <cstddef>
 
+struct LakeWaterShader;
+
 namespace terrain_internal
 {
 enum class HalfCubeCorner
@@ -135,7 +137,10 @@ void DrawWaterTile(
     float cellSize,
     int x,
     int z,
-    float waterY);
+    float waterY,
+    Vector4 edgeMask,
+    HalfCubeCorner landCorner,
+    const LakeWaterShader *lakeWater);
 
 } // namespace terrain_internal
 
